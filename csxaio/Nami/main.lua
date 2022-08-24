@@ -38,11 +38,11 @@ cb.add(cb.load, function()
 
         -- tables with spell data for prediction
 		self.qData = {
-            delay = 0.25,
-            speed = 1200,
-            range = 1200,
-            rangeType = 0,
-            type = spellType.linear,
+            delay = 1,
+            speed = math.huge,
+            range = 800,
+            radius= 200,
+            type = spellType.circular,
             collision = {
                 hero = SpellCollisionType.Hard,
                 minion = SpellCollisionType.Hard,
@@ -51,13 +51,13 @@ cb.add(cb.load, function()
                 flags = bit.bor(CollisionFlags.Windwall, CollisionFlags.Samira, CollisionFlags.Braum)
             }
         }
-        self.eData = {
+        self.rData = {
             delay = 0.5,
             speed = 1300,
-            range = 1200,
+            range = 2500,
 			radius = 300,
-            rangeType = 0,
-            type = spellType.circular,
+            width = 500,
+            type = spellType.linear,
             collision = {
                 hero = SpellCollisionType.Hard,
                 minion = SpellCollisionType.Hard,
