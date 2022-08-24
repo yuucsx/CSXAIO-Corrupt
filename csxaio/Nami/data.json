@@ -1,6 +1,6 @@
 {
   "Name": "CSXAIO",    
-  "File": "main.lua",
+  "File": "CSXNami.lua",
   "Version": 1.0,
   "Type": "champion",
   "Champions": ["Nami"]
