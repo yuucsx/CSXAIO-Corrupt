@@ -2,18 +2,8 @@
 local Settings = {} 
 
 -- Utility "class" constructor
-local Utility = setmetatable({}, 
-{
-    __call = function(self, ...)
-        local result = setmetatable({}, {__index = self})
-        result:init(...)
+local Utility = {}
 
-        return result
-    end
-})
-
-function Utility:init()
-end
 
 function Utility:GetDistanceSqr(p1, p2)
     p1 = p1.x ~= nil and p1 or p1.pos
@@ -33,7 +23,7 @@ function Utility:GetDistance(p1, p2)
 end
 
 function Utility:GetLatency()
-    return game.latency / 2
+    return game.latency / 2000
 end
 
 function Utility:FilterEnemies(a,b)
@@ -56,45 +46,31 @@ function Utility:GetPrediction(target, inputTable)
 end
 
 function Utility:CanCastSpell(spell)
-    local time = myHero:getSpell(spell).readyTime
-    return time and (time > 0 and time <= Utility:GetLatency()) 
-end
+    local time = myHero.asHero:getSpell(spell).readyTime
+    return time < game.time + Utility:GetLatency()
+end 
 
 function Utility:IsCastingSpell()
     return myHero.activeSpell and myHero.activeSpell.castEndTime > game.time + Utility:GetLatency()
 end
 
 -- Input "class" constructor
-local Input = setmetatable({}, 
-{
-    __call = function(self, ...)
-        local result = setmetatable({}, {__index = self})
-        result:init(...)
+local Input = {}
 
-        return result
-    end
-})
 
-function Input:init()
-    self.last_q_cast = nil
-    self.last_w_cast = nil
-    self.last_e_cast = nil
-    self.last_r_cast = nil
-end
+function Input:CastSpell(spell, castPos)
 
-function Input:CastSpell(spell, pos)
     if not spell then return end
     if not pos then pos = myHero end
 
-    if not Utility:CanCastSpell(spell) then return end
     if Utility:IsCastingSpell() then return end
+    if not Utility:CanCastSpell(spell) then return end
+    pos = pos ~= nil and (castPos and castPos.x or pos.pos)
 
-    pos = pos ~= nil and (pos and pos.x or pos.pos)
-
-    if spell == SpellSlot.W or spell == SpellSlot.E and pos.pos then
-        return myHero:castSpell(spell, pos)
+    if spell == SpellSlot.W or spell == SpellSlot.E and castPos.pos then
+        return myHero:castSpell(spell, vec3(castPos.pos.x, 0, castPos.pos.z))
     end 
-    return myHero:castSpell(spell, vec3(pos.x, 0, pos.z))
+    return myHero:castSpell(spell, vec3(castPos.x, 0, castPos.z))
 end
 
 function Input:SendMove(pos)
@@ -120,10 +96,10 @@ local Nami = setmetatable({},
     end
 })
 
-function Nami:Init()
+function Nami:init()
     self.Spells = {
         Q = {
-            delay = 0.25 + 0.726,
+            delay = 0.25 ,
             speed = math.huge,
             range = 850,
             radius = 200,
@@ -151,23 +127,41 @@ function Nami:Init()
             }
         }
     }
+
+    self:LoadEvents()
 end
 
-function Nami:UseQ(target, pred)
-    if not pred then return Input:CastSpell(SpellSlot.Q, target.position) end
+function Nami:LoadEvents()
+    cb.add(cb.tick, function() return self:Combo() end )
+    cb.add(cb.draw, function() return self:OnDraw() end )
+end
 
-    return Input:CastSpell(SpellSlot.Q, pred.position)
+function Nami:OnDraw()
+
+        local alpha = player:spellSlot(SpellSlot.Q).state == 0 and 255 or 50
+        graphics.drawCircle(player.pos, self.Spells.Q.range, 1, graphics.argb(alpha, 255, 102, 255))
+    
+end
+
+function Nami:UseQ(target, prediction)
+    if not prediction then return Input:CastSpell(SpellSlot.Q, target.pos) end
+    return Input:CastSpell(SpellSlot.Q, prediction.castPosition)
+end
+
+function Nami:UseR(target, prediction)
+    if not prediction then return Input:CastSpell(SpellSlot.R, target.pos) end
+    return Input:CastSpell(SpellSlot.R, prediction.castPosition)
 end
 
 function Nami:Combo()
     local target = Utility:GetOrbwalkerTarget()
     if not target then return end
 
-    return self:UseQ(target, Utility:GetPrediction(target, self.Spells.Q))
+    self:UseQ(target, Utility:GetPrediction(target.asAIBase, self.Spells.Q))
+   -- self:UseW(target, Utility:GetPrediction(target.asAIBase, self.Spells.W))
+    --self:UseE(myHero, Utility:GetPrediction(target.asAIBase, self.Spells.E))
+    self:UseR(target, Utility:GetPrediction(target.asAIBase, self.Spells.R))
+
 end
 
-
-
-
-
-
+Nami = Nami()
