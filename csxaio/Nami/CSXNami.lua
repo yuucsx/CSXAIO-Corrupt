@@ -131,15 +131,57 @@ function Nami:init()
     self:LoadEvents()
 end
 
+local function class()
+    local cls = {}
+    cls.__index = cls
+    return setmetatable(cls, {__call = function (c, ...)
+        local instance = setmetatable({}, cls)
+        if cls.__init then
+            cls.__init(instance, ...)
+        end
+        return instance
+    end})
+end
+
+local _Menu = class()
+Menu = nil
+
+function _Menu:__init()
+    menu = menu.create("csxaio", "CSX AIO")
+    menu:spacer("header1", "Sex Nami")
+
+    menu:header("combo", "Combo")
+    menu.combo:spacer("headerQ", "[Q] Settings")
+    menu.combo:boolean("use_q", "Use Q", true)
+
+    menu.combo:spacer("headerE", "[W] Settings")
+    menu.combo:boolean("use_w", "Use W", true)
+
+    menu.combo:spacer("headerW", "[E] Settings")
+    menu.combo:boolean("use_e", "Use E", true)
+
+    menu.combo:spacer("headerR", "[R] Settings")
+    menu.combo:boolean("use_r", "Use R", true)
+
+    menu:header("drawings", "Drawings")
+    menu.drawings:boolean("draw_q", "Draw Q", true)
+    menu.drawings:color('color_q', 'Q Color', graphics.argb(255, 255, 0, 0))
+
+
+    Menu = self
+end
+
 function Nami:LoadEvents()
     cb.add(cb.tick, function() return self:Combo() end )
     cb.add(cb.draw, function() return self:OnDraw() end )
+    cb.add(cb.unload, function() menu.delete('csxaio') end)
 end
 
 function Nami:OnDraw()
-
+    if menu.drawings.draw_q:get() then
         local alpha = player:spellSlot(SpellSlot.Q).state == 0 and 255 or 50
-        graphics.drawCircle(player.pos, self.Spells.Q.range, 1, graphics.argb(alpha, 255, 102, 255))
+        graphics.drawCircle(player.pos, self.Spells.Q.range, 1, menu.drawings.color_q:get())
+    end
     
 end
 
@@ -156,12 +198,19 @@ end
 function Nami:Combo()
     local target = Utility:GetOrbwalkerTarget()
     if not target then return end
+    
+    if Orbwalker.isComboActive then
 
+    if menu.combo.use_q:get() then
     self:UseQ(target, Utility:GetPrediction(target.asAIBase, self.Spells.Q))
+    end
    -- self:UseW(target, Utility:GetPrediction(target.asAIBase, self.Spells.W))
     --self:UseE(myHero, Utility:GetPrediction(target.asAIBase, self.Spells.E))
+    if menu.combo.use_r:get() then
     self:UseR(target, Utility:GetPrediction(target.asAIBase, self.Spells.R))
-
+    end
+end
 end
 
 Nami = Nami()
+_Menu()
