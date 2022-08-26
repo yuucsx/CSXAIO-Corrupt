@@ -41,7 +41,9 @@ function Utility:GetTarget(range)
 end
 
 function Utility:GetPrediction(target, inputTable)
+    if inputTable.speed == 0 then return end
     local prediction = pred.getPrediction(target, inputTable)
+    if prediction and prediction.hitChance < 50 then return end
     return prediction
 end
 
@@ -52,6 +54,32 @@ end
 
 function Utility:IsCastingSpell()
     return myHero.activeSpell and myHero.activeSpell.castEndTime > game.time + Utility:GetLatency()
+end
+
+local delayedActions, delayedActionsExecuter = {}, nil
+function Utility:DelayAction(func, delay, args)
+    if not delayedActionsExecuter then
+        function delayedActionsExecuter()
+            for t, funcs in pairs(delayedActions) do
+                if t <= os.clock() then
+                    for i = 1, #funcs do
+                        local f = funcs[i]
+                        if f and f.func then
+                            f.func(unpack(f.args or {}))
+                        end
+                    end
+                    delayedActions[t] = nil
+                end
+            end
+        end
+        cb.add(cb.tick, delayedActionsExecuter)
+    end
+    local t = os.clock() + (delay or 0)
+    if delayedActions[t] then
+        delayedActions[t][#delayedActions[t] + 1] = {func = func, args = args}
+    else
+        delayedActions[t] = {{func = func, args = args}}
+    end
 end
 
 -- Input "class" constructor
@@ -86,6 +114,40 @@ function Input:SendAttack(unit)
 end
 
 -- Nami "class" constructor
+local Menu = setmetatable({}, 
+{
+    __call = function(self, ...)
+        local result = setmetatable({}, {__index = self})
+        result:init(...)
+
+        return result
+    end
+})
+
+function Menu:init()
+    menu = menu.create("csxaio", "CSX AIO")
+    menu:spacer("header1", "Sex Nami")
+
+    menu:header("combo", "Combo")
+    menu.combo:spacer("headerQ", "[Q] Settings")
+    menu.combo:boolean("use_q", "Use Q", true)
+
+    menu.combo:spacer("headerE", "[W] Settings")
+    menu.combo:boolean("use_w", "Use W", true)
+
+    menu.combo:spacer("headerW", "[E] Settings")
+    menu.combo:boolean("use_e", "Use E", true)
+
+    menu.combo:spacer("headerR", "[R] Settings")
+    menu.combo:boolean("use_r", "Use R", true)
+
+    menu:header("drawings", "Drawings")
+    menu.drawings:boolean("draw_q", "Draw Q", true)
+    menu.drawings:color('color_q', 'Q Color', graphics.argb(255, 255, 0, 0))
+
+end
+
+-- Nami "class" constructor
 local Nami = setmetatable({}, 
 {
     __call = function(self, ...)
@@ -99,7 +161,7 @@ local Nami = setmetatable({},
 function Nami:init()
     self.Spells = {
         Q = {
-            delay = 0.25 ,
+            delay = 0.5 ,
             speed = math.huge,
             range = 850,
             radius = 200,
@@ -131,49 +193,13 @@ function Nami:init()
     self:LoadEvents()
 end
 
-local function class()
-    local cls = {}
-    cls.__index = cls
-    return setmetatable(cls, {__call = function (c, ...)
-        local instance = setmetatable({}, cls)
-        if cls.__init then
-            cls.__init(instance, ...)
-        end
-        return instance
-    end})
-end
-
-local _Menu = class()
-Menu = nil
-
-function _Menu:__init()
-    menu = menu.create("csxaio", "CSX AIO")
-    menu:spacer("header1", "Sex Nami")
-
-    menu:header("combo", "Combo")
-    menu.combo:spacer("headerQ", "[Q] Settings")
-    menu.combo:boolean("use_q", "Use Q", true)
-
-    menu.combo:spacer("headerE", "[W] Settings")
-    menu.combo:boolean("use_w", "Use W", true)
-
-    menu.combo:spacer("headerW", "[E] Settings")
-    menu.combo:boolean("use_e", "Use E", true)
-
-    menu.combo:spacer("headerR", "[R] Settings")
-    menu.combo:boolean("use_r", "Use R", true)
-
-    menu:header("drawings", "Drawings")
-    menu.drawings:boolean("draw_q", "Draw Q", true)
-    menu.drawings:color('color_q', 'Q Color', graphics.argb(255, 255, 0, 0))
-
-
-    Menu = self
-end
-
 function Nami:LoadEvents()
     cb.add(cb.tick, function() return self:Combo() end )
     cb.add(cb.draw, function() return self:OnDraw() end )
+    cb.add(cb.basicAttack, function(...) return self:OnBasicAttack(...) end )
+    cb.add(cb.processSpell, function(...) return self:OnProcessSpell(...) end )
+    cb.add(cb.newPath, function(...) return self:OnNewPath(...) end )
+
     cb.add(cb.unload, function() menu.delete('csxaio') end)
 end
 
@@ -185,8 +211,70 @@ function Nami:OnDraw()
     
 end
 
+function Nami:GetQSpeed(target)
+    local pred = pred.positionAfterTime(target, 0.9)
+    if not pred then return 0 end
+    local dist = Utility:GetDistance(myHero, pred)
+    return Input:CastSpell(SpellSlot.Q, pred)
+
+end
+
+function Nami:CalculateReactionTime(target, windup)
+    if not target then return end
+    local TimeToCast = windup
+    local MoveSpeed = target.characterIntermediate.moveSpeed
+    local HalfRadius = 100
+    local Latency = 0.04
+    local CastTime = 0.20
+    local InactiveTime = (HalfRadius / MoveSpeed) + TimeToCast + (Latency / 2)
+    print(0.976 - InactiveTime)
+    return 0.976 - InactiveTime
+end
+
+function Nami:OnBasicAttack(obj, attack)
+    if obj.team == myHero.team then return end
+    if not obj.isHero then return end
+    if not attack then return end
+    if attack.target and attack.target == myHero then return end
+    if self:CalculateReactionTime(obj, attack.castDelay) < 0.39 then 
+        self:UseQ(obj)
+    end
+
+end
+
+function Nami:OnNewPath(obj, path, isDash, speed)
+    if obj.team == myHero.team then return end
+    if not obj.isHero then return end
+    if not path then return end
+    if not isDash then return end
+    if not speed then return end
+    if not path[2] then return end
+    local Endpos = vec3(path[2].x,path[2].y,path[2].z)
+    local Endtime = Utility:GetDistance(obj, path[2]) / speed
+    if Endtime > 0.976 then 
+        return Utility:DelayAction(
+        function()
+            if Utility:GetDistance(myHero, path[2]) <= self.Spells.Q.range + (self.Spells.Q.radius / 2) then 
+            return Input:CastSpell(SpellSlot.Q, Endpos)
+            end
+        end, 0.976 - Endtime)
+    end
+    Input:CastSpell(SpellSlot.Q, Endpos) 
+end
+
+function Nami:OnProcessSpell(obj, spell)
+    if obj.team == myHero.team then return end
+    if not obj.isHero then return end
+    if not spell then return end
+    if spell.name:find("Summoner") then return end
+    if self:CalculateReactionTime(obj, spell.castDelay) < 0.39 then 
+        self:UseQ(obj)
+    end
+
+end
+
 function Nami:UseQ(target, prediction)
-    if not prediction then return Input:CastSpell(SpellSlot.Q, target.pos) end
+    if not prediction then return Input:CastSpell(SpellSlot.Q, target) end
     return Input:CastSpell(SpellSlot.Q, prediction.castPosition)
 end
 
@@ -199,18 +287,17 @@ function Nami:Combo()
     local target = Utility:GetOrbwalkerTarget()
     if not target then return end
     
-    if Orbwalker.isComboActive then
+    if orb.isComboActive then
 
-    if menu.combo.use_q:get() then
-    self:UseQ(target, Utility:GetPrediction(target.asAIBase, self.Spells.Q))
-    end
-   -- self:UseW(target, Utility:GetPrediction(target.asAIBase, self.Spells.W))
-    --self:UseE(myHero, Utility:GetPrediction(target.asAIBase, self.Spells.E))
-    if menu.combo.use_r:get() then
-    self:UseR(target, Utility:GetPrediction(target.asAIBase, self.Spells.R))
+        if menu.combo.use_q:get() then
+            self:GetQSpeed(target.asAIBase)
+        end
+
+        if menu.combo.use_r:get() then
+            self:UseR(target, Utility:GetPrediction(target.asAIBase, self.Spells.R))
+        end
     end
 end
-end
 
+Menu = Menu()
 Nami = Nami()
-_Menu()
