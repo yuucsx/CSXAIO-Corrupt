@@ -3,6 +3,7 @@ local Settings = {}
 
 -- Utility "class" constructor
 local Utility = {}
+local HitchanceMenu = { [0] = HitChance.Low, HitChance.Medium, HitChance.High, HitChance.VeryHigh, HitChance.DashingEnd }
 
 
 function Utility:GetDistanceSqr(p1, p2)
@@ -189,7 +190,6 @@ function Nami:init()
             }
         }
     }
-
     self:LoadEvents()
 end
 
@@ -199,6 +199,8 @@ function Nami:LoadEvents()
     cb.add(cb.basicAttack, function(...) return self:OnBasicAttack(...) end )
     cb.add(cb.processSpell, function(...) return self:OnProcessSpell(...) end )
     cb.add(cb.newPath, function(...) return self:OnNewPath(...) end )
+    cb.add(cb.buff,function(...) self:OnBuff(...) end)
+
 
     cb.add(cb.unload, function() menu.delete('csxaio') end)
 end
@@ -276,6 +278,18 @@ end
 function Nami:UseQ(target, prediction)
     if not prediction then return Input:CastSpell(SpellSlot.Q, target) end
     return Input:CastSpell(SpellSlot.Q, prediction.castPosition)
+
+end
+
+function Nami:OnBuff(obj, buff)
+        if obj and obj.team ~= myHero.team and obj.type == myHero.type and buff then
+            print("aki")
+         if obj:hasBuffOfType(BuffType.Snare) then --or BuffType.Silence or BuffType.Taunt or BuffType.Polymorph or BuffType.Fear or BuffType.Charm or BuffType.Suppression or BuffType.Knockup or BuffType.Knockback or BuffType.Asleep) then
+            print("peguei buff")
+            Input:CastSpell(SpellSlot.Q, obj.pos)
+            print("castei")
+        end
+    end
 end
 
 function Nami:UseR(target, prediction)
