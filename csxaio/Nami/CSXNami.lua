@@ -3,8 +3,44 @@ local Settings = {}
 
 -- Utility "class" constructor
 local Utility = {}
-local HitchanceMenu = { [0] = HitChance.Low, HitChance.Medium, HitChance.High, HitChance.VeryHigh, HitChance.DashingEnd }
+local function is_in_range(target, pos, range)
+    return target.position:distanceSqr(pos) < range ^ 2
+end
 
+local function get_best_target_priority(target_list, priority_list, range)
+
+end
+
+local function get_min_dist_target(target_list, main_target, range)
+    local min_dist = math.huge
+    local min_target = nil
+
+    if type(target_list[1]) == "table" then
+        for _, list in ipairs(target_list) do
+            for _, target in ipairs(list) do 
+                if target.networkId ~= main_target.networkId and is_in_range(target, objManager.player.position, range) then
+                    local curr_dist = target.position:distanceSqr(main_target.position)
+                    if curr_dist < min_dist then
+                        min_dist = curr_dist
+                        min_target = target
+                    end
+                end
+            end
+        end
+    else 
+        for _, target in ipairs(target_list) do
+            if target.networkId ~= main_target.networkId and is_in_range(target, objManager.player.position, range) then
+                local curr_dist = target.position:distanceSqr(main_target.position)
+                if curr_dist < min_dist then
+                    min_dist = curr_dist
+                    min_target = target
+                end
+            end
+        end
+    end
+
+    return min_target
+end
 
 function Utility:GetDistanceSqr(p1, p2)
     p1 = p1.x ~= nil and p1 or p1.pos
@@ -135,6 +171,7 @@ function Menu:init()
 
     menu.combo:spacer("headerE", "[W] Settings")
     menu.combo:boolean("use_w", "Use W", true)
+    menu.combo:slider('heal_slider', "Don't W if my Health <=", 5, 100, 30, 5)
 
     menu.combo:spacer("headerW", "[E] Settings")
     menu.combo:boolean("use_e", "Use E", true)
@@ -160,7 +197,11 @@ local Nami = setmetatable({},
 })
 
 function Nami:init()
+
+    self.castTime = {0,0,0,0}
+
     self.Spells = {
+
         Q = {
             delay = 0.5 ,
             speed = math.huge,
@@ -175,6 +216,7 @@ function Nami:init()
                 flags = bit.bor(CollisionFlags.Windwall, CollisionFlags.Samira)
             }
         },
+
         R = {
             delay = 0.5,
             speed = 850,
@@ -195,6 +237,7 @@ end
 
 function Nami:LoadEvents()
     cb.add(cb.tick, function() return self:Combo() end )
+
     cb.add(cb.draw, function() return self:OnDraw() end )
     cb.add(cb.basicAttack, function(...) return self:OnBasicAttack(...) end )
     cb.add(cb.processSpell, function(...) return self:OnProcessSpell(...) end )
@@ -275,21 +318,39 @@ function Nami:OnProcessSpell(obj, spell)
 
 end
 
+function Nami:OnBuff(obj, buff)
+    if obj and obj.team ~= myHero.team and obj.type == myHero.type and buff then
+        if  player.position:distance(obj.pos) < 900 then
+     if obj:hasBuffOfType(BuffType.Snare) then --or BuffType.Silence or BuffType.Taunt or BuffType.Polymorph or BuffType.Fear or BuffType.Charm or BuffType.Suppression or BuffType.Knockup or BuffType.Knockback or BuffType.Asleep) then
+        Input:CastSpell(SpellSlot.Q, obj.pos)
+    end
+    end
+    end
+end
+
+function Nami:GetPercentHealth(obj)
+    local obj = obj or myHero
+    return (obj.health / obj.maxHealth) * 100
+  end
+
 function Nami:UseQ(target, prediction)
     if not prediction then return Input:CastSpell(SpellSlot.Q, target) end
     return Input:CastSpell(SpellSlot.Q, prediction.castPosition)
 
 end
 
-function Nami:OnBuff(obj, buff)
-        if obj and obj.team ~= myHero.team and obj.type == myHero.type and buff then
-            print("aki")
-         if obj:hasBuffOfType(BuffType.Snare) then --or BuffType.Silence or BuffType.Taunt or BuffType.Polymorph or BuffType.Fear or BuffType.Charm or BuffType.Suppression or BuffType.Knockup or BuffType.Knockback or BuffType.Asleep) then
-            print("peguei buff")
-            Input:CastSpell(SpellSlot.Q, obj.pos)
-            print("castei")
-        end
+function Nami:UseW()
+    local ally = nil
+    if not ally then ally = get_min_dist_target(objManager.heroes.allies.list, player, 650) end
+
+    if ally then
+    if  self:GetPercentHealth(ally) <= menu.combo.heal_slider.value then
+        print(menu.combo.heal_slider.value)
+        print(self:GetPercentHealth(ally))
+        --print(self:GetPercentHealth() >= menu.combo.heal_slider:get())
+        player:castSpell(SpellSlot.W, ally, false, true)
     end
+end
 end
 
 function Nami:UseR(target, prediction)
@@ -297,10 +358,19 @@ function Nami:UseR(target, prediction)
     return Input:CastSpell(SpellSlot.R, prediction.castPosition)
 end
 
+function Nami:IsSpellLocked()
+    return self.spellLocked > game.time
+end
+
 function Nami:Combo()
     local target = Utility:GetOrbwalkerTarget()
     if not target then return end
-    
+    --if self:IsSpellLocked() then return end
+
+    if menu.combo.use_w:get() then
+        self:UseW()
+    end
+
     if orb.isComboActive then
 
         if menu.combo.use_q:get() then
