@@ -1,3 +1,18 @@
+--[[   
+Todo:
+aquele target selector la que tu ia fazer mas ficou com preguica
+Semi keys Q-W-E-R
+R Min. Enemies
+Priotity no W
+AOE Q
+duo mode
+Blacklist ally
+E se for dar AA ou spell
+Q R for Anti-Gapclose
+Q R to Interrupt
+E pra ajudar no evade
+KS
+--]]
 -- Settings table, will use this instead of retrieving menu value using :get() 
 local Settings = {} 
 
@@ -14,7 +29,7 @@ end
 function Utility:GetDistance(p1, p2)
     p1 = p1.x ~= nil and p1 or p1.pos
     if not p2 then 
-        p2 = player.position
+        p2 = myHero.position
     else
         p2 = p2.x ~= nil and p2 or p2.pos
     end
@@ -35,8 +50,8 @@ function Utility:GetOrbwalkerTarget()
 end
 
 function Utility:GetTarget(range)
-    range = range or player.characterIntermediate.attackRange
-    local enemies = ts.getResult(function(a) return self:GetDistance(player, a) <= range end)
+    range = range or myHero.characterIntermediate.attackRange
+    local enemies = ts.getResult(function(a) return self:GetDistance(myHero, a) <= range end)
     if not enemies then return end
     return enemies
 end
@@ -49,12 +64,12 @@ function Utility:GetPrediction(target, inputTable)
 end
 
 function Utility:CanCastSpell(spell)
-    local time = player.asHero:getSpell(spell).readyTime
+    local time = myHero.asHero:getSpell(spell).readyTime
     return time < game.time + Utility:GetLatency()
 end 
 
 function Utility:IsCastingSpell()
-    return player.activeSpell and player.activeSpell.castEndTime > game.time + Utility:GetLatency()
+    return myHero.activeSpell and myHero.activeSpell.castEndTime > game.time + Utility:GetLatency()
 end
 
 local delayedActions, delayedActionsExecuter = {}, nil
@@ -90,28 +105,28 @@ local Input = {}
 function Input:CastSpell(spell, castPos)
 
     if not spell then return end
-    if not pos then pos = player end
+    if not pos then pos = myHero end
 
     if Utility:IsCastingSpell() then return end
     if not Utility:CanCastSpell(spell) then return end
     pos = pos ~= nil and (castPos and castPos.x or pos.pos)
 
     if spell == SpellSlot.W or spell == SpellSlot.E and castPos.pos then
-        return player:castSpell(spell, vec3(castPos.pos.x, 0, castPos.pos.z))
+        return myHero:castSpell(spell, vec3(castPos.pos.x, 0, castPos.pos.z))
     end 
-    return player:castSpell(spell, vec3(castPos.x, 0, castPos.z))
+    return myHero:castSpell(spell, vec3(castPos.x, 0, castPos.z))
 end
 
 function Input:SendMove(pos)
     if not pos then return end
 
-    return player:SendMove(pos)
+    return myHero:SendMove(pos)
 end
 
 function Input:SendAttack(unit)
     if not unit then return end
 
-    return player:SendAttack(unit)
+    return myHero:SendAttack(unit)
 end
 
 -- Nami "class" constructor
@@ -230,8 +245,8 @@ end
 
 function Nami:OnDraw()
     if menu.drawings.draw_q:get() then
-        local alpha = player:spellSlot(SpellSlot.Q).state == 0 and 255 or 50
-        graphics.drawCircle(player.pos, self.Spells.Q.range, 1, menu.drawings.color_q:get())
+        local alpha = myHero:spellSlot(SpellSlot.Q).state == 0 and 255 or 50
+        graphics.drawCircle(myHero.pos, self.Spells.Q.range, 1, menu.drawings.color_q:get())
     end
     
 end
@@ -239,7 +254,7 @@ end
 function Nami:GetQSpeed(target)
     local pred = pred.positionAfterTime(target, 0.976)
     if not pred then return 0 end
-    local dist = Utility:GetDistance(player, pred)
+    local dist = Utility:GetDistance(myHero, pred)
     return Input:CastSpell(SpellSlot.Q, pred)
 
 end
@@ -260,17 +275,18 @@ function Nami:CalculateCastToLand()
 end
 
 function Nami:OnBasicAttack(obj, attack)
-    if obj.team == player.team then return end
+    if not menu.auto.use_q_aa:get() then return end 
+    if obj.team == myHero.team then return end
     if not obj.isHero then return end
     if not attack then return end
-    if attack.target and attack.target == player then return end
+    if attack.target and attack.target == myHero then return end
     if self:CalculateCastToLand() - self:CalculateEscapeTime(obj, attack.castDelay) <= 0.25 then 
         self:UseQ(obj)
     end
 end
 
 function Nami:OnNewPath(obj, path, isDash, speed)
-    if obj.team == player.team then return end
+    if obj.team == myHero.team then return end
     if not obj.isHero then return end
     if not path then return end
     if not isDash then return end
@@ -282,7 +298,7 @@ function Nami:OnNewPath(obj, path, isDash, speed)
     if Endtime > 0.976 then 
         return Utility:DelayAction(
         function()
-            if Utility:GetDistance(player, path[2]) <= self.Spells.Q.range + (self.Spells.Q.radius / 2) then
+            if Utility:GetDistance(myHero, path[2]) <= self.Spells.Q.range + (self.Spells.Q.radius / 2) then
             return Input:CastSpell(SpellSlot.Q, Endpos)
             end
         end, 0.976 - Endtime)
@@ -291,7 +307,8 @@ function Nami:OnNewPath(obj, path, isDash, speed)
 end
 
 function Nami:OnProcessSpell(obj, spell)
-    if obj.team == player.team then return end
+    if not menu.auto.use_q_spells:get() then return end 
+    if obj.team == myHero.team then return end
     if not obj.isHero then return end
     if not spell then return end
     --print(self:CalculateEscapeTime(obj, spell.castDelay))
@@ -303,17 +320,31 @@ function Nami:OnProcessSpell(obj, spell)
 end
 
 function Nami:OnBuff(obj, buff)
-    if obj and obj.team ~= player.team and obj.type == player.type and buff then
-        if player.position:distance(obj.pos) < 900 and menu.auto.use_q_cc:get() then
-            if pred.getCrowdControlledTime(obj.asAIBase) > 0 then
-                Input:CastSpell(SpellSlot.Q, obj.pos)
-            end
-        end
+
+    if not obj or
+    not buff or
+    obj.team == myHero.team or 
+    obj.type ~= myHero.type or
+    not obj.isHero then
+        return
     end
+    if Utility:GetDistance(obj, myHero) > (self.Spells.Q.range + self.Spells.Q.radius / 2) or
+    not menu.auto.use_q_cc:get() then 
+        return 
+    end
+
+    local ccedTime = pred.getCrowdControlledTime(obj.asAIBase)
+    local ping = Utility:GetLatency()
+    local castTime = self:CalculateCastToLand()
+    local totalTime = ccedTime - castTime + ping + 0.4366
+    if totalTime >= self:CalculateEscapeTime(obj, 0) then return end
+    if totalTime < 0 then return end
+
+    return Input:CastSpell(SpellSlot.Q, obj.pos)
 end
 
 function Nami:GetPercentHealth(obj)
-    local obj = obj or player
+    local obj = obj or myHero
     return (obj.health / obj.maxHealth) * 100
 end
 
@@ -333,7 +364,7 @@ function Nami:GetClosestAlly(range)
         end
     end
     if #allyHeroes == 1 then return allyHeroes[1] end
-    table.sort(allyHeroes, function(a, b) return Utility:GetDistance(a, player) < range and Utility:GetDistance(a, player) < Utility:GetDistance(b, player) end)
+    table.sort(allyHeroes, function(a, b) return Utility:GetDistance(a, myHero) < range and Utility:GetDistance(a, myHero) < Utility:GetDistance(b, myHero) end)
     return allyHeroes[1]
 end
 
@@ -341,7 +372,7 @@ function Nami:UseW()
     local ally = self:GetClosestAlly(725)
     if ally then
         if self:GetPercentHealth(ally) <= menu.auto.heal_slider.value then
-            player:castSpell(SpellSlot.W, ally, false, true)
+            myHero:castSpell(SpellSlot.W, ally, false, true)
         end
     end
 end
