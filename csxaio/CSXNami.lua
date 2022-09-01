@@ -19,6 +19,167 @@ local Settings = {}
 -- Utility "class" constructor
 local Utility = {}
 
+-- 5=1 2=4 3=3 2=3 4=2 1=5
+local priorityTable = {
+    ["Aatrox"] =       3,
+    ["Ahri"] =         4,
+    ["Akali"] =        4,
+    ["Akshan"] =       5,
+    ["Alistar"] =      1,
+    ["Amumu"] =        1,
+    ["Anivia"] =       4,
+    ["Annie"] =        4,
+    ["Ashe"] =         5,
+    ["AurelionSol"] =  4,
+    ["Azir"] =         4,
+    ["Bard"] =         1,
+    ["BelVeth"]  =     3,
+    ["Blitzcrank"] =   1,
+    ["Brand"] =        4,
+    ["Braum"] =        1,
+    ["Caitlyn"] =      5,
+    ["Camille"] =      1,
+    ["Cassiopeia"] =   4,
+    ["Chogath"] =      1,
+    ["Corki"] =        5,
+    ["Darius"] =       1,
+    ["Diana"] =        4,
+    ["DrMundo"] =      1,
+    ["Draven"] =       5,
+    ["Ekko"] =         4,
+    ["Elise"] =        3,
+    ["Evelynn"] =      4,
+    ["Ezreal"] =       5,
+    ["FiddleSticks"] = 4,
+    ["Fiora"] =        3,
+    ["Fizz"] =         4,
+    ["Galio"] =        1,
+    ["Gangplank"] =    3,
+    ["Garen"] =        1,
+    ["Gnar"] =         1,
+    ["Gragas"] =       4,
+    ["Graves"] =       1,
+    ["Gwen"]   =       3,   
+    ["Hecarim"] =      1,
+    ["Heimerdinger"] = 4,
+    ["Illaoi"] =       1,
+    ["Irelia"] =       3,
+    ["Ivern"] =        3,
+    ["Janna"] =        3,
+    ["JarvanIV"] =     1,
+    ["Jax"] =          3,
+    ["Jayce"] =        4,
+    ["Jhin"] =         5,
+    ["Jinx"] =         5,
+    ["Kaisa"] =        5,
+    ["Kalista"] =      5,
+    ["Karma"] =        3,
+    ["Karthus"] =      4,
+    ["Kassadin"] =     4,
+    ["Katarina"] =     4,
+    ["Kayle"] =        4,
+    ["Kayn"] =         3,
+    ["Kindred"] =      5,
+    ["Kennen"] =       4,
+    ["Khazix"] =       3,
+    ["Kled"] =         3,
+    ["KogMaw"] =       5,
+    ["Leblanc"] =      4,
+    ["LeeSin"] =       3,
+    ["Leona"] =        1,
+    ["Lissandra"] =    4,
+    ["Lucian"] =       5,
+    ["Lulu"] =         3,
+    ["Lux"] =          4,
+    ["Malphite"] =     1,
+    ["Malzahar"] =     4,
+    ["Maokai"] =       1,
+    ["MasterYi"] =     3,
+    ["MissFortune"] =  5,
+    ["MonkeyKing"] =   3,
+    ["Mordekaiser"] =  4,
+    ["Morgana"] =      4,
+    ["Nami"] =         3,
+    ["Nasus"] =        1,
+    ["Nautilus"] =     1,
+    ["Neeko"] =        4,
+    ["Nidalee"] =      4,
+    ["Nillah"] =       1,
+    ["Nocturne"] =     3,
+    ["Nunu"] =         1,
+    ["Olaf"] =         3,
+    ["Orianna"] =      4,
+    ["Ornn"] =         1,
+    ["Pantheon"] =     3,
+    ["Poppy"] =        3,
+    ["Pyke"] =         4,
+    ["Qiyana"] =       3,
+    ["Quinn"] =        5,
+    ["Rakan"]=         1,
+    ["Rammus"] =       1,
+    ["RekSai"] =       4,
+    ["Rell"] =         1,
+    ["Renata"] =       2,
+    ["Renekton"] =     1,
+    ["Rengar"] =       3,
+    ["Riven"] =        3,
+    ["Rumble"] =       3,
+    ["Ryze"] =         4,
+    ["Samira"] =       5,
+    ["Sejuani"] =      1,
+    ["Senna"]   =      4,
+    ["Seraphine"] =    3,
+    ["Sett"]      =    3,
+    ["Shaco"] =        4,
+    ["Shen"] =         1,
+    ["Shyvana"] =      1,
+    ["Singed"] =       1,
+    ["Sion"] =         4,
+    ["Sivir"] =        5,
+    ["Skarner"] =      1,
+    ["Sona"] =         3,
+    ["Soraka"] =       5,
+    ["Swain"] =        4,
+    ["Sylas"] =        4,
+    ["Syndra"] =       4,
+    ["TahmKench"] =    1,
+    ["Taliyah"] =      4,
+    ["Talon"] =        4,
+    ["Taric"] =        1,
+    ["Teemo"] =        4,
+    ["Thresh"] =       1,
+    ["Tristana"] =     5,
+    ["Trundle"] =      1,
+    ["Tryndamere"] =   3,
+    ["TwistedFate"] =  4,
+    ["Twitch"] =       5,
+    ["Udyr"] =         1,
+    ["Urgot"] =        5,
+    ["Varus"] =        5,
+    ["Vex"]   =        4,
+    ["Vayne"] =        5,
+    ["Veigar"] =       4,
+    ["Velkoz"] =       4,
+    ["Vi"] =           3,
+    ["Viego"] =        3, 
+    ["Viktor"] =       4,
+    ["Vladimir"] =     4,
+    ["Volibear"] =     1,
+    ["Warwick"] =      1,
+    ["Xerath"] =       4,
+    ["Xayah"] =        5,
+    ["XinZhao"] =      3,
+    ["Yasuo"] =        4,
+    ["Yorick"] =       1,
+    ["Yuumi"] =        3,
+    ["Zac"] =          1,
+    ["Zed"] =          4,
+    ["Zeri"] =         5, 
+    ["Ziggs"] =        4,
+    ["Zilean"] =       3,
+    ["Zoe"] =          4,
+    ["Zyra"] =         4,
+}
 
 function Utility:GetDistanceSqr(p1, p2)
     p1 = p1.x ~= nil and p1 or p1.pos
@@ -49,11 +210,19 @@ function Utility:GetOrbwalkerTarget()
     return orb.comboTarget
 end
 
-function Utility:GetTarget(range)
-    range = range or myHero.characterIntermediate.attackRange
-    local enemies = ts.getResult(function(a) return self:GetDistance(myHero, a) <= range end)
-    if not enemies then return end
-    return enemies
+function Utility:GetTarget(validator, all)
+    if not validator and not all then return ts.getTargets()[1] end
+
+    local enemyTable = {}
+    for _, enemy in ipairs(ts.getTargets()) do
+        if validator(enemy) then
+            table.insert(enemyTable, enemy)
+        end
+    end
+    if not all then
+        return enemyTable[1]
+    end
+    return enemyTable
 end
 
 function Utility:GetPrediction(target, inputTable)
@@ -148,12 +317,28 @@ function Menu:init()
     menu.combo:spacer("headerQ", "[Q] Settings")
     menu.combo:boolean("use_q", "Use Q", true)
 
-    menu.combo:spacer("headerW", "[E] Settings")
-    menu.combo:boolean("use_e", "Use E", true)
-
     menu.combo:spacer("headerR", "[R] Settings")
     menu.combo:boolean("use_r", "Use R", true)
 
+    menu:header("harass", "Harass")
+    menu.harass:spacer("headerQ", "[Q] Settings")
+    menu.harass:boolean("use_q", "Use Q", true)
+
+    menu.harass:spacer("headerW", "[W] Settings")
+    menu.harass:boolean("use_w", "Use W", true)
+
+    menu.harass:spacer("headerW", "[E] Settings")
+    menu.harass:boolean("use_e", "Use E", true)
+
+    menu:header("prio", "Priority")
+        for _, obj in ipairs(objManager.heroes.list) do
+            if obj and obj.team == myHero.team then
+                local ally = obj
+                local priority = priorityTable[ally.skinName] ~= nil and priorityTable[ally.skinName] or 1
+                menu.prio:slider(ally.skinName .. "_prio", ally.skinName .. " Priority", 1, 5, priority, 1)
+            end
+
+        end
     menu:header("auto", "Automatic")
     menu.auto:spacer("headerQauto", "[Q] Settings")
     menu.auto:boolean("use_q_cc", "Use Q in CC", true)
@@ -165,9 +350,24 @@ function Menu:init()
     menu.auto:boolean("use_w", "Use W", true)
     menu.auto:slider('heal_slider', "Don't W if Health <=", 5, 100, 30, 5)
 
+    menu.auto:spacer("headerEauto", "[E] Settings")
+    menu.auto:spacer("headerW", "[E] Settings")
+    menu.auto:boolean("use_e", "Use E", true)
+
+
+    menu:header("misc", "Misc")
+    menu.misc:keybind('manual_q', 'Manual Q', 0x51, false, false)
+
+
     menu:header("drawings", "Drawings")
     menu.drawings:boolean("draw_q", "Draw Q", true)
     menu.drawings:color('color_q', 'Q Color', graphics.argb(255, 255, 0, 0))
+    menu.drawings:boolean("draw_w", "Draw W", true)
+    menu.drawings:color('color_w', 'W Color', graphics.argb(255, 255, 0, 0))
+    menu.drawings:boolean("draw_e", "Draw E", true)
+    menu.drawings:color('color_e', 'E Color', graphics.argb(255, 255, 0, 0))
+    menu.drawings:boolean("draw_r", "Draw R", true)
+    menu.drawings:color('color_r', 'R Color', graphics.argb(255, 255, 0, 0))
 
 end
 
@@ -184,6 +384,7 @@ local Nami = setmetatable({},
 
 function Nami:init()
 
+    self.selectedAlly = nil
     self.castTime = {0,0,0,0}
 
     self.Spells = {
@@ -233,7 +434,8 @@ end
 
 function Nami:LoadEvents()
     cb.add(cb.tick, function() return self:Combo() end )
-    cb.add(cb.draw, function() return self:OnDraw() end )
+    cb.add(cb.drawWorld, function() return self:OnDraw() end )
+    cb.add(cb.glow, function() return self:OnGlow() end)
     cb.add(cb.basicAttack, function(...) return self:OnBasicAttack(...) end )
     cb.add(cb.processSpell, function(...) return self:OnProcessSpell(...) end )
     cb.add(cb.newPath, function(...) return self:OnNewPath(...) end )
@@ -249,6 +451,31 @@ function Nami:OnDraw()
         graphics.drawCircle(myHero.pos, self.Spells.Q.range, 1, menu.drawings.color_q:get())
     end
     
+    if menu.drawings.draw_w:get() then
+        local alpha = myHero:spellSlot(SpellSlot.W).state == 0 and 255 or 50
+        graphics.drawCircle(myHero.pos, self.Spells.W.range, 1, menu.drawings.color_w:get())
+    end
+
+    if menu.drawings.draw_e:get() then
+        local alpha = myHero:spellSlot(SpellSlot.E).state == 0 and 255 or 50
+        graphics.drawCircle(myHero.pos, self.Spells.E.range, 1, menu.drawings.color_e:get())
+    end
+    
+    if menu.drawings.draw_r:get() then
+        local alpha = myHero:spellSlot(SpellSlot.R).state == 0 and 255 or 50
+        graphics.drawCircle(myHero.pos, self.Spells.R.range, 1, menu.drawings.color_r:get())
+    end
+
+    if self.selectedAlly then
+
+        graphics.drawCircleFilled(self.selectedAlly.pos, self.selectedAlly.boundingRadius, graphics.argb(140, 0, 255, 120))
+    end
+end
+
+function Nami:OnGlow()
+    if self.selectedAlly then
+        self.selectedAlly:addGlow(graphics.argb(140, 0, 255, 120), 3, 5)
+    end
 end
 
 function Nami:GetQSpeed(target)
@@ -354,22 +581,50 @@ function Nami:UseQ(target, prediction)
     return Input:CastSpell(SpellSlot.Q, prediction.castPosition)
 end
 
-
-function Nami:GetClosestAlly(range)
-    local allyHeroes = {}
-
-    for _, obj in ipairs(objManager.heroes.list) do
-        if obj and obj ~= myHero and obj.team == myHero.team and Utility:GetDistance(obj, myHero) < range then 
-            allyHeroes[#allyHeroes + 1] = obj
-        end
-    end
-    if #allyHeroes == 1 then return allyHeroes[1] end
-    table.sort(allyHeroes, function(a, b) return Utility:GetDistance(a, myHero) < range and Utility:GetDistance(a, myHero) < Utility:GetDistance(b, myHero) end)
-    return allyHeroes[1]
+function Nami:GetPriority(unit)
+    return menu.prio[unit.skinName .. "_prio"] and 6 - menu.prio[unit.skinName .. "_prio"]:get() or 3
 end
 
+function Nami:SelectAlly()
+
+    for _, obj in ipairs(objManager.heroes.list) do
+        if obj and obj ~= myHero and obj.team == myHero.team and Utility:GetDistance(game.cursorPos, obj) < 250 and keyboard.isKeyDown(0x01) then 
+            self.selectedAlly = obj
+        end
+    end
+end
+
+function Nami:IsValidAlly(ally)
+    return ally and not ally.isDead and ally.isHero and ally.isVisible and ally.asAttackableUnit.isTargetable
+end
+function Nami:GetAlly(range)
+
+    if self.selectedAlly ~= nil and Utility:IsValidAlly(self.selectedAlly) and Utility:GetDistance(myHero, self.selectedAlly) < range  then
+        return self.selectedAlly
+    end
+
+    local attackCount = math.huge
+    local healAlly = nil
+    for i, obj in ipairs(objManager.heroes.list) do
+
+        if not obj then return end
+
+        local ally = obj[i]
+        if Utility:IsValidAlly(ally) and Utility:GetDistance(myHero, ally) < range then
+            local myDmg = myHero.asAIBase.totalAttackDamage
+            local attackNeeded = math.ceil(ally.health / myDmg)
+            local compare = (attackNeeded / self:GetPriority(ally))
+            if compare < attackCount then
+                attackCount = compare
+                healAlly = ally
+            end
+        end
+    end
+    return healAlly
+end 
+
 function Nami:UseW()
-    local ally = self:GetClosestAlly(725)
+    local ally = self:GetAlly(self.Spells.W.range)
     if ally then
         if self:GetPercentHealth(ally) <= menu.auto.heal_slider.value then
             myHero:castSpell(SpellSlot.W, ally, false, true)
@@ -382,29 +637,37 @@ function Nami:UseR(target, prediction)
     return Input:CastSpell(SpellSlot.R, prediction.castPosition)
 end
 
+
+
 function Nami:IsSpellLocked()
     return self.spellLocked > game.time
 end
 
 function Nami:Combo()
-    local target = Utility:GetTarget(self.Spells.Q.range)
+    self:SelectAlly()
+
+    local target = Utility:GetTarget(function (a) return Utility:GetDistance(a, myHero) < self.Spells.Q.range end) 
     if not target then return end
 
     --if self:IsSpellLocked() then return end
 
-    if menu.auto.use_w:get() then
+    local ComboActive = orb.isComboActive
+    local HarassActive = orb.harassKeyDown
+    local UseQ = menu.combo.use_q:get()
+    local UseW = menu.auto.use_w:get()
+    local UseE = menu.auto.use_e:get()
+    local UseR = menu.combo.use_r:get()
+
+    local ManualQ = menu.misc.manual_q:get()
+    
+
+
+    if UseW or ManualW then
         self:UseW()
     end
 
-    if orb.isComboActive then
-
-        if menu.combo.use_q:get() then
-            self:GetQSpeed(target.asAIBase)
-        end
-
-        if menu.combo.use_r:get() then
-            self:UseR(target, Utility:GetPrediction(target.asAIBase, self.Spells.R))
-        end
+    if UseQ and ComboActive or ManualQ then
+        self:GetQSpeed(target.asAIBase)
     end
 end
 
