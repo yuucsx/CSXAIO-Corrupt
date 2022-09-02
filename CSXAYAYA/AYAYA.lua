@@ -1,3 +1,8 @@
+--e só pegar o objeto que morreu
+--e verificar c sua kill mudou =3
+--ai se tiver 2 kill em X tempo, significa q foi double kill, ai manda a foto do double kill?
+--mas tem q verificar se a kill for sua
+
 local dead = graphics.createTexture("C:\\ProgramData\\2264419601716787603\\Scripts\\CSXAYAYA\\Pictures\\die.png")
 local double_kill = graphics.createTexture("C:\\ProgramData\\2264419601716787603\\Scripts\\CSXAYAYA\\Pictures\\double_kill.png")
 local triple_kill = graphics.createTexture("C:\\ProgramData\\2264419601716787603\\Scripts\\CSXAYAYA\\Pictures\\triple_kill.png")
