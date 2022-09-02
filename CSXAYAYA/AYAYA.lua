@@ -1,4 +1,8 @@
-local tx = graphics.createTexture("C:\\ProgramData\\2264419601716787603\\Scripts\\CSXAYAYA\\Pictures\\die.png")
+local dead = graphics.createTexture("C:\\ProgramData\\2264419601716787603\\Scripts\\CSXAYAYA\\Pictures\\die.png")
+local double_kill = graphics.createTexture("C:\\ProgramData\\2264419601716787603\\Scripts\\CSXAYAYA\\Pictures\\double_kill.png")
+local triple_kill = graphics.createTexture("C:\\ProgramData\\2264419601716787603\\Scripts\\CSXAYAYA\\Pictures\\triple_kill.png")
+local quadra_kill = graphics.createTexture("C:\\ProgramData\\2264419601716787603\\Scripts\\CSXAYAYA\\Pictures\\quadra_kill.png")
+local penta_kill = graphics.createTexture("C:\\ProgramData\\2264419601716787603\\Scripts\\CSXAYAYA\\Pictures\\penta_kill.png")
 -- AYAYA "class" constructor
 local Menu = setmetatable({}, 
 {
@@ -34,7 +38,7 @@ function AYAYA:init()
 end
 
 function AYAYA:LoadEvents()
-    cb.add(cb.draw, function() return self:OnDraw() end )
+    cb.add(cb.drawHUD, function() return self:OnDraw() end )
     cb.add(cb.death, function(obj) return self:OnDeath(obj) end)
     cb.add(cb.unload, function() menu.delete('csxayaya') end)
 end
@@ -54,10 +58,13 @@ function AYAYA:OnTick()
 end
 
 function AYAYA:OnDraw()
-
+    if not menu.use_ayaya:get() then return end 
+    
     if self.isDead ~= false and game.time < self.isDead + 5 then 
-        graphics.drawTexture(tx, vec2(730, 150), vec2(500, 500))
+        graphics.drawTexture(dead, vec2(730, 150), vec2(500, 500))
     end
+
+
 end
 
 
