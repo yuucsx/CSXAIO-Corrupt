@@ -1,8 +1,3 @@
---e só pegar o objeto que morreu
---e verificar c sua kill mudou =3
---ai se tiver 2 kill em X tempo, significa q foi double kill, ai manda a foto do double kill?
---mas tem q verificar se a kill for sua
-
 local dead = graphics.createTexture("C:\\ProgramData\\2264419601716787603\\Scripts\\CSXAYAYA\\Pictures\\die.png")
 local double_kill = graphics.createTexture("C:\\ProgramData\\2264419601716787603\\Scripts\\CSXAYAYA\\Pictures\\double_kill.png")
 local triple_kill = graphics.createTexture("C:\\ProgramData\\2264419601716787603\\Scripts\\CSXAYAYA\\Pictures\\triple_kill.png")
@@ -19,10 +14,35 @@ local Menu = setmetatable({},
     end
 })
 
+local delayedActions, delayedActionsExecuter = {}, nil
+function DelayAction(func, delay, args)
+    if not delayedActionsExecuter then
+        function delayedActionsExecuter()
+            for t, funcs in pairs(delayedActions) do
+                if t <= os.clock() then
+                    for i = 1, #funcs do
+                        local f = funcs[i]
+                        if f and f.func then
+                            f.func(unpack(f.args or {}))
+                        end
+                    end
+                    delayedActions[t] = nil
+                end
+            end
+        end
+        cb.add(cb.tick, delayedActionsExecuter)
+    end
+    local t = os.clock() + (delay or 0)
+    if delayedActions[t] then
+        delayedActions[t][#delayedActions[t] + 1] = {func = func, args = args}
+    else
+        delayedActions[t] = {{func = func, args = args}}
+    end
+end
+
 function Menu:init()
     menu = menu.create("csxayaya", "CSX ayaya")
     menu:spacer("header1", "Sex AYAYA")
-
     menu:boolean("use_ayaya", "PLS ENABLE ME", true)
 end
 
@@ -40,18 +60,31 @@ local AYAYA = setmetatable({},
 function AYAYA:init()
     self.isDead = false
     self:LoadEvents()
+    self.killTable = {}
+    self.latestKills = myHero.asHero.kills
+    self.lastKillTime = 0
+    self.single = nil
+    self.double = nil
+    self.triple = nil
+    self.quadra = nil
+    self.penta  = nil
+    self.canPenta = false
 end
 
 function AYAYA:LoadEvents()
     cb.add(cb.drawHUD, function() return self:OnDraw() end )
+    cb.add(cb.tick, function() return self:OnTick() end )
     cb.add(cb.death, function(obj) return self:OnDeath(obj) end)
     cb.add(cb.unload, function() menu.delete('csxayaya') end)
 end
 
 
 function AYAYA:OnDeath(obj)
-    if obj.skinName ~= myHero.skinName then return end
-    self.isDead = game.time
+    if obj.networkId ~= myHero.networkId and obj.isHero and self.latestKills ~= myHero.asHero.stats.kills then
+        print(obj.name)
+        table.insert(self.killTable, {killTime = game.time})
+
+    end
 end
 
 function AYAYA:OnSpawn(obj)
@@ -59,12 +92,47 @@ function AYAYA:OnSpawn(obj)
     self.isDead = game.time
 end
 
+function AYAYA:Kills(obj)
+    if obj.skinName ~= myHero.skinName then return end
+    print(self.kills[1])
+    if myHero.asHero.stats.kills < game.time + 5 then return end
+end
+
+function AYAYA:Dead(obj)
+    if obj.skinName ~= myHero.skinName then return end
+    self.isDead = game.time
+end
+
 function AYAYA:OnTick()
+
+
+    if self.killTable ~= nil and #self.killTable ~= 0 then
+        local pastKillCount = #self.killTable
+        for _, kill in ipairs(self.killTable) do
+            local time = kill.killTime
+            if self.double == nil and #self.killTable == 2 then
+                self.double = game.time
+            end
+            if self.triple == nil and #self.killTable == 3 then
+                self.triple = game.time
+            end
+            if self.quadra == nil and #self.killTable == 4 then
+                self.quadra = game.time
+            end
+            if self.penta == nil and #self.killTable == 5 then
+                self.canPenta = game.time
+                self.killTable = {}
+            end
+        end 
+    end 
+    if self.penta ~= nil then print(#self.killTable) return end
 end
 
 function AYAYA:OnDraw()
     if not menu.use_ayaya:get() then return end 
-    
+    if self.canPenta ~= false and self.canPenta + 5 > game.time then
+        graphics.drawTexture(dead, vec2(730, 150), vec2(500, 500))
+    end
     if self.isDead ~= false and game.time < self.isDead + 5 then 
         graphics.drawTexture(dead, vec2(730, 150), vec2(500, 500))
     end

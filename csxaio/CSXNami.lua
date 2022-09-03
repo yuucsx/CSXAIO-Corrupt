@@ -1,17 +1,11 @@
 --[[   
 Todo:
-aquele target selector la que tu ia fazer mas ficou com preguica
-Semi keys Q-W-E-R
-R Min. Enemies
-Priotity no W
-AOE Q
-duo mode
 Blacklist ally
-E se for dar AA ou spell
+E se ally der spell
 Q R for Anti-Gapclose
 Q R to Interrupt
-E pra ajudar no evade
 KS
+castar Q na zonyas
 --]]
 -- Settings table, will use this instead of retrieving menu value using :get() 
 local Settings = {} 
@@ -19,7 +13,6 @@ local Settings = {}
 -- Utility "class" constructor
 local Utility = {}
 
--- 5=1 2=4 3=3 2=3 4=2 1=5
 local priorityTable = {
     ["Aatrox"] =       3,
     ["Ahri"] =         4,
@@ -241,6 +234,27 @@ function Utility:IsCastingSpell()
     return myHero.activeSpell and myHero.activeSpell.castEndTime > game.time + Utility:GetLatency()
 end
 
+function Utility:NearestAlly(position)
+    local closest = nil
+    local lowest  = 10000 
+
+    if not closest then
+        for _, ally in pairs(objManager.heroes.allies.list) do
+            if not ally or ally.team ~= myHero.team or ally.isDead then return end
+            local dist = Utility:GetDistance(ally, position)
+            if ally ~= myHero and dist < 150 then
+                if dist < lowest then
+                    lowest = dist
+                    closest = ally
+                end
+            end
+        end
+    end
+
+    return closest
+end
+
+
 local delayedActions, delayedActionsExecuter = {}, nil
 function Utility:DelayAction(func, delay, args)
     if not delayedActionsExecuter then
@@ -266,6 +280,24 @@ function Utility:DelayAction(func, delay, args)
         delayedActions[t] = {{func = func, args = args}}
     end
 end
+
+function Utility:Validate(enemy)
+	return enemy
+	and enemy.isValid
+    and enemy.isVisible
+	and not enemy.isDead
+	and enemy.asAttackableUnit.isTargetable
+	and enemy.maxHealth > 5
+    and enemy.maxHealth < 10000
+	and not enemy.isInvulnerable
+	and enemy.type == myHero.type
+end
+
+
+function Utility:IsValidAlly(ally)
+    return ally and not ally.isDead and ally.isHero and ally.isVisible and ally.asAttackableUnit.isTargetable
+end
+
 
 -- Input "class" constructor
 local Input = {}
@@ -351,8 +383,7 @@ function Menu:init()
     menu.auto:slider('heal_slider', "Don't W if Health <=", 5, 100, 30, 5)
 
     menu.auto:spacer("headerEauto", "[E] Settings")
-    menu.auto:spacer("headerW", "[E] Settings")
-    menu.auto:boolean("use_e", "Use E", true)
+    menu.auto:boolean("use_e_aa", "Use E in ally AA", true)
 
 
     menu:header("misc", "Misc")
@@ -439,6 +470,7 @@ function Nami:LoadEvents()
     cb.add(cb.basicAttack, function(...) return self:OnBasicAttack(...) end )
     cb.add(cb.processSpell, function(...) return self:OnProcessSpell(...) end )
     cb.add(cb.newPath, function(...) return self:OnNewPath(...) end )
+
     cb.add(cb.buff,function(...) self:OnBuff(...) end)
 
 
@@ -468,7 +500,7 @@ function Nami:OnDraw()
 
     if self.selectedAlly then
 
-        graphics.drawCircleFilled(self.selectedAlly.pos, self.selectedAlly.boundingRadius, graphics.argb(140, 0, 255, 120))
+        graphics.drawCircleFilled(self.selectedAlly.pos, 400, graphics.argb(140, 0, 255, 120))
     end
 end
 
@@ -479,10 +511,17 @@ function Nami:OnGlow()
 end
 
 function Nami:GetQSpeed(target)
+    if not Utility:Validate(target) then return end
     local pred = pred.positionAfterTime(target, 0.976)
-    if not pred then return 0 end
-    local dist = Utility:GetDistance(myHero, pred)
-    return Input:CastSpell(SpellSlot.Q, pred)
+    local points = self:GetMECPoints()
+    if points and #points >= 2 then 
+        pred = mec.find(points).center
+    else
+        return Input:CastSpell(SpellSlot.Q, pred)
+    end
+    if Utility:GetDistance(pred, myHero) <= self.Spells.Q.range + self.Spells.Q.radius / 2 then
+        return Input:CastSpell(SpellSlot.Q, pred)
+    end
 
 end
 
@@ -502,14 +541,8 @@ function Nami:CalculateCastToLand()
 end
 
 function Nami:OnBasicAttack(obj, attack)
-    if not menu.auto.use_q_aa:get() then return end 
-    if obj.team == myHero.team then return end
-    if not obj.isHero then return end
-    if not attack then return end
-    if attack.target and attack.target == myHero then return end
-    if self:CalculateCastToLand() - self:CalculateEscapeTime(obj, attack.castDelay) <= 0.25 then 
-        self:UseQ(obj)
-    end
+    self:QAA(obj, attack)
+    self:useE(obj, attack)
 end
 
 function Nami:OnNewPath(obj, path, isDash, speed)
@@ -582,21 +615,30 @@ function Nami:UseQ(target, prediction)
 end
 
 function Nami:GetPriority(unit)
-    return menu.prio[unit.skinName .. "_prio"] and 6 - menu.prio[unit.skinName .. "_prio"]:get() or 3
+    return menu.prio[unit.skinName .. "_prio"] and 6 + menu.prio[unit.skinName .. "_prio"]:get() or 3
 end
 
+ 
 function Nami:SelectAlly()
 
-    for _, obj in ipairs(objManager.heroes.list) do
-        if obj and obj ~= myHero and obj.team == myHero.team and Utility:GetDistance(game.cursorPos, obj) < 250 and keyboard.isKeyDown(0x01) then 
+    if self.selectedAlly and Utility:GetDistance(self.selectedAlly, game.cursorPos) > 120 and keyboard.isKeyDown(0x01) then
+        --print(self.selectedAlly.skinName .. " top")
+        self.selectedAlly = nil
+    end
+
+    local obj = Utility:NearestAlly(game.cursorPos)
+    if not obj or obj.team ~= myHero.team or not keyboard.isKeyDown(0x01) then return end
+
+    if obj ~= myHero then
+    
+        if Utility:GetDistance(obj, game.cursorPos) < 120 then
             self.selectedAlly = obj
+            --print(self.selectedAlly.skinName .. " aids")
         end
+        
     end
 end
 
-function Nami:IsValidAlly(ally)
-    return ally and not ally.isDead and ally.isHero and ally.isVisible and ally.asAttackableUnit.isTargetable
-end
 function Nami:GetAlly(range)
 
     if self.selectedAlly ~= nil and Utility:IsValidAlly(self.selectedAlly) and Utility:GetDistance(myHero, self.selectedAlly) < range  then
@@ -604,17 +646,15 @@ function Nami:GetAlly(range)
     end
 
     local attackCount = math.huge
-    local healAlly = nil
-    for i, obj in ipairs(objManager.heroes.list) do
-
-        if not obj then return end
-
-        local ally = obj[i]
-        if Utility:IsValidAlly(ally) and Utility:GetDistance(myHero, ally) < range then
+    local healAlly = nil 
+    for _, ally in ipairs(objManager.heroes.allies.list) do
+      --  print(ally.skinName)
+        if not ally or ally.team ~= myHero.team then return end
+        if ally ~= myHero and Utility:IsValidAlly(ally) and Utility:GetDistance(myHero, ally) <= range then
             local myDmg = myHero.asAIBase.totalAttackDamage
             local attackNeeded = math.ceil(ally.health / myDmg)
             local compare = (attackNeeded / self:GetPriority(ally))
-            if compare < attackCount then
+            if compare < attackCount  then
                 attackCount = compare
                 healAlly = ally
             end
@@ -625,10 +665,28 @@ end
 
 function Nami:UseW()
     local ally = self:GetAlly(self.Spells.W.range)
-    if ally then
-        if self:GetPercentHealth(ally) <= menu.auto.heal_slider.value then
-            myHero:castSpell(SpellSlot.W, ally, false, true)
+    if ally and ally.healthPercent ~= 100 then
+        if ally.healthPercent <= menu.auto.heal_slider.value then
+            myHero:castSpell(SpellSlot.W, ally)
         end
+    end
+end
+
+function Nami:QAA(obj, attack)
+    if not menu.auto.use_q_aa:get() then return end 
+    if obj.team == myHero.team then return end
+    if not obj.isHero then return end
+    if not attack then return end
+    if attack.target and attack.target == myHero then return end
+    if self:CalculateCastToLand() - self:CalculateEscapeTime(obj, attack.castDelay) <= 0.25 then 
+        self:UseQ(obj)
+    end
+end
+
+function Nami:useE(obj, attack)
+    if not menu.auto.use_e_aa:get() then return end 
+    if obj.team == myHero.team and obj.networkId ~= myHero.networkId and Utility:GetDistance(obj, myHero) < 800 and attack.hasTarget and attack.target.isHero then
+        myHero:castSpell(SpellSlot.E, obj)
     end
 end
 
@@ -637,7 +695,17 @@ function Nami:UseR(target, prediction)
     return Input:CastSpell(SpellSlot.R, prediction.castPosition)
 end
 
-
+function Nami:GetMECPoints()
+    local points = {}
+    for _, obj in ipairs(ts.getTargets()) do
+        if obj and obj.team ~= myHero.team and Utility:Validate(obj) and Utility:GetDistance(obj, myHero) < self.Spells.Q.range + self.Spells.Q.radius / 2 then
+            local pred = pred.positionAfterTime(obj, 0.976)
+            if not pred then return end
+            table.insert(points, obj)
+        end
+    end
+    return points
+end
 
 function Nami:IsSpellLocked()
     return self.spellLocked > game.time
@@ -645,6 +713,13 @@ end
 
 function Nami:Combo()
     self:SelectAlly()
+
+
+    local UseW = menu.auto.use_w:get()
+    if UseW then
+        self:UseW()
+    end
+
 
     local target = Utility:GetTarget(function (a) return Utility:GetDistance(a, myHero) < self.Spells.Q.range end) 
     if not target then return end
@@ -655,14 +730,13 @@ function Nami:Combo()
     local HarassActive = orb.harassKeyDown
     local UseQ = menu.combo.use_q:get()
     local UseW = menu.auto.use_w:get()
-    local UseE = menu.auto.use_e:get()
+    --local UseE = menu.auto.use_e:get()
     local UseR = menu.combo.use_r:get()
 
     local ManualQ = menu.misc.manual_q:get()
     
 
-
-    if UseW or ManualW then
+    if UseW then
         self:UseW()
     end
 
