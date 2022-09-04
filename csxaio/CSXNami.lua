@@ -1,10 +1,8 @@
 --[[   
 Todo:
 Blacklist ally
-E se ally der spell
+E se ally der spell (fodase)
 Q R for Anti-Gapclose
-Q R to Interrupt
-KS
 castar Q na zonyas
 --]]
 -- Settings table, will use this instead of retrieving menu value using :get() 
@@ -377,10 +375,14 @@ function Menu:init()
     menu.auto:boolean("use_q_dash", "Use Q in Dash/Jumps", true)
     menu.auto:boolean("use_q_spells", "Use Q in Spells", true)
     menu.auto:boolean("use_q_aa", "Use Q in AA", true)
+    menu.auto:boolean("use_q_channeling", "Use Q Interrupt", true)
+    menu.auto:boolean("use_r_channeling", "Use R Interrupt", true)
 
     menu.auto:spacer("headerWauto", "[W] Settings")
     menu.auto:boolean("use_w", "Use W", true)
     menu.auto:slider('heal_slider', "Don't W if Health <=", 5, 100, 30, 5)
+    menu.auto:boolean("use_w_ks", "Use W KillSteal", true)
+
 
     menu.auto:spacer("headerEauto", "[E] Settings")
     menu.auto:boolean("use_e_aa", "Use E in ally AA", true)
@@ -522,7 +524,12 @@ function Nami:GetQSpeed(target)
     if Utility:GetDistance(pred, myHero) <= self.Spells.Q.range + self.Spells.Q.radius / 2 then
         return Input:CastSpell(SpellSlot.Q, pred)
     end
+end
 
+function Nami:getWDamage()
+    local BaseDamage = {70, 110, 150, 190, 230}
+    local APScale = 0.5
+    return BaseDamage[myHero:spellSlot(SpellSlot.W).level] + APScale * myHero.asAIBase.totalAbilityPower
 end
 
 function Nami:CalculateEscapeTime(target, windup)
@@ -543,6 +550,10 @@ end
 function Nami:OnBasicAttack(obj, attack)
     self:QAA(obj, attack)
     self:useE(obj, attack)
+end
+
+function Nami:isCastingInterruptibleSpell(obj)
+    self:channelingSpell(obj)
 end
 
 function Nami:OnNewPath(obj, path, isDash, speed)
@@ -580,7 +591,6 @@ function Nami:OnProcessSpell(obj, spell)
 end
 
 function Nami:OnBuff(obj, buff)
-
     if not obj or
     not buff or
     obj.team == myHero.team or 
@@ -608,19 +618,12 @@ function Nami:GetPercentHealth(obj)
     return (obj.health / obj.maxHealth) * 100
 end
 
-function Nami:UseQ(target, prediction)
-    if not prediction then return Input:CastSpell(SpellSlot.Q, target) end
-
-    return Input:CastSpell(SpellSlot.Q, prediction.castPosition)
-end
-
 function Nami:GetPriority(unit)
     return menu.prio[unit.skinName .. "_prio"] and 6 + menu.prio[unit.skinName .. "_prio"]:get() or 3
 end
 
  
 function Nami:SelectAlly()
-
     if self.selectedAlly and Utility:GetDistance(self.selectedAlly, game.cursorPos) > 120 and keyboard.isKeyDown(0x01) then
         --print(self.selectedAlly.skinName .. " top")
         self.selectedAlly = nil
@@ -630,17 +633,14 @@ function Nami:SelectAlly()
     if not obj or obj.team ~= myHero.team or not keyboard.isKeyDown(0x01) then return end
 
     if obj ~= myHero then
-    
         if Utility:GetDistance(obj, game.cursorPos) < 120 then
             self.selectedAlly = obj
             --print(self.selectedAlly.skinName .. " aids")
         end
-        
     end
 end
 
 function Nami:GetAlly(range)
-
     if self.selectedAlly ~= nil and Utility:IsValidAlly(self.selectedAlly) and Utility:GetDistance(myHero, self.selectedAlly) < range  then
         return self.selectedAlly
     end
@@ -663,13 +663,42 @@ function Nami:GetAlly(range)
     return healAlly
 end 
 
-function Nami:UseW()
-    local ally = self:GetAlly(self.Spells.W.range)
-    if ally and ally.healthPercent ~= 100 then
-        if ally.healthPercent <= menu.auto.heal_slider.value then
-            myHero:castSpell(SpellSlot.W, ally)
+function Nami:channelingSpell()
+    for index, target in pairs(ts.getTargets()) do                          
+        local validTarget =  target and not target.isZombie and target:isValidTarget(self.Spells.Q.range, true, myHero.pos)
+        if not validTarget then goto continue end
+
+    if Utility:GetDistance(target, myHero) > (self.Spells.Q.range + self.Spells.Q.radius / 2) or
+    not menu.auto.use_q_channeling:get() then 
+        return 
+    end
+
+    local UseQ = menu.auto.use_q_channeling:get()
+    
+    local channelingSpell = (target.isCastingInterruptibleSpell and target.isCastingInterruptibleSpell > 0)
+    --local canBeStunned = not target.isUnstoppable and not target:getBuff("MorganaE") and not target:getBuff("bansheesveil") and not target:getBuff("itemmagekillerveil") and not target:getBuff("malzaharpassiveshield")
+
+    if UseQ and channelingSpell then
+        print("casteiQ")
+        myHero:castSpell(SpellSlot.Q, target)
+    end
+    ::continue::
+end
+
+function Nami:KillSteal()
+        if myHero:spellSlot(SpellSlot.W).state ~= 0 then return end
+        if not menu.auto.use_w_ks:get() then return end
+        --local range = myHero.characterIntermediate.attackRange
+        for _, target in pairs(objManager.heroes.list) do
+            if target.isEnemy and target.isVisible and target.isTargetable and not target.isDead and target.isValid and not target.isZombie and target:isValidTarget(self.Spells.W.range, true, myHero.pos) then
+                local dmg = self:getWDamage()
+                if dmg >= target.health then
+                    myHero:castSpell(SpellSlot.W, target)
+                end
+            end
         end
     end
+
 end
 
 function Nami:QAA(obj, attack)
@@ -680,6 +709,34 @@ function Nami:QAA(obj, attack)
     if attack.target and attack.target == myHero then return end
     if self:CalculateCastToLand() - self:CalculateEscapeTime(obj, attack.castDelay) <= 0.25 then 
         self:UseQ(obj)
+    end
+end
+
+function Nami:GetMECPoints()
+    --Q AOE
+    local points = {}
+    for _, obj in ipairs(ts.getTargets()) do
+        if obj and obj.team ~= myHero.team and Utility:Validate(obj) and Utility:GetDistance(obj, myHero) < self.Spells.Q.range + self.Spells.Q.radius / 2 then
+            local pred = pred.positionAfterTime(obj, 0.976)
+            if not pred then return end
+            table.insert(points, obj)
+        end
+    end
+    return points
+end
+
+function Nami:UseQ(target, prediction)
+    if not prediction then return Input:CastSpell(SpellSlot.Q, target) end
+
+    return Input:CastSpell(SpellSlot.Q, prediction.castPosition)
+end
+
+function Nami:UseW()
+    local ally = self:GetAlly(self.Spells.W.range)
+    if ally and ally.healthPercent ~= 100 then
+        if ally.healthPercent <= menu.auto.heal_slider.value then
+            myHero:castSpell(SpellSlot.W, ally)
+        end
     end
 end
 
@@ -695,25 +752,15 @@ function Nami:UseR(target, prediction)
     return Input:CastSpell(SpellSlot.R, prediction.castPosition)
 end
 
-function Nami:GetMECPoints()
-    local points = {}
-    for _, obj in ipairs(ts.getTargets()) do
-        if obj and obj.team ~= myHero.team and Utility:Validate(obj) and Utility:GetDistance(obj, myHero) < self.Spells.Q.range + self.Spells.Q.radius / 2 then
-            local pred = pred.positionAfterTime(obj, 0.976)
-            if not pred then return end
-            table.insert(points, obj)
-        end
-    end
-    return points
-end
-
 function Nami:IsSpellLocked()
     return self.spellLocked > game.time
 end
 
 function Nami:Combo()
-    self:SelectAlly()
 
+    self:SelectAlly()
+    self:channelingSpell()
+    self:KillSteal()
 
     local UseW = menu.auto.use_w:get()
     if UseW then
@@ -723,14 +770,12 @@ function Nami:Combo()
 
     local target = Utility:GetTarget(function (a) return Utility:GetDistance(a, myHero) < self.Spells.Q.range end) 
     if not target then return end
-
     --if self:IsSpellLocked() then return end
 
     local ComboActive = orb.isComboActive
     local HarassActive = orb.harassKeyDown
     local UseQ = menu.combo.use_q:get()
     local UseW = menu.auto.use_w:get()
-    --local UseE = menu.auto.use_e:get()
     local UseR = menu.combo.use_r:get()
 
     local ManualQ = menu.misc.manual_q:get()
