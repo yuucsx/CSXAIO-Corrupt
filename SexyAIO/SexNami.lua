@@ -1,10 +1,11 @@
 --[[   
 Todo:
-Blacklist ally
-E se ally der spell (fodase)
-Q R for Anti-Gapclose
+Blacklist ally W E
+E se ally der spell
 castar Q na zonyas
+Haras - zzzzzzzzzzzzzz
 --]]
+
 -- Settings table, will use this instead of retrieving menu value using :get() 
 local Settings = {} 
 
@@ -340,43 +341,21 @@ local Menu = setmetatable({},
 })
 
 function Menu:init()
-    menu = menu.create("csxaio", "CSX AIO")
+    menu = menu.create("csxaio", "Sexy AIO")
     menu:spacer("header1", "Sex Nami")
 
     menu:header("combo", "Combo")
     menu.combo:spacer("headerQ", "[Q] Settings")
     menu.combo:boolean("use_q", "Use Q", true)
 
-    menu.combo:spacer("headerR", "[R] Settings")
-    menu.combo:boolean("use_r", "Use R", true)
-
-    menu:header("harass", "Harass")
-    menu.harass:spacer("headerQ", "[Q] Settings")
-    menu.harass:boolean("use_q", "Use Q", true)
-
-    menu.harass:spacer("headerW", "[W] Settings")
-    menu.harass:boolean("use_w", "Use W", true)
-
-    menu.harass:spacer("headerW", "[E] Settings")
-    menu.harass:boolean("use_e", "Use E", true)
-
-    menu:header("prio", "Priority")
-        for _, obj in ipairs(objManager.heroes.list) do
-            if obj and obj.team == myHero.team then
-                local ally = obj
-                local priority = priorityTable[ally.skinName] ~= nil and priorityTable[ally.skinName] or 1
-                menu.prio:slider(ally.skinName .. "_prio", ally.skinName .. " Priority", 1, 5, priority, 1)
-            end
-
-        end
     menu:header("auto", "Automatic")
     menu.auto:spacer("headerQauto", "[Q] Settings")
     menu.auto:boolean("use_q_cc", "Use Q in CC", true)
     menu.auto:boolean("use_q_dash", "Use Q in Dash/Jumps", true)
-    menu.auto:boolean("use_q_spells", "Use Q in Spells", true)
+    menu.auto:boolean("use_q_spells", "Use Q in Spells", false)
     menu.auto:boolean("use_q_aa", "Use Q in AA", true)
     menu.auto:boolean("use_q_channeling", "Use Q Interrupt", true)
-    menu.auto:boolean("use_r_channeling", "Use R Interrupt", true)
+
 
     menu.auto:spacer("headerWauto", "[W] Settings")
     menu.auto:boolean("use_w", "Use W", true)
@@ -387,19 +366,43 @@ function Menu:init()
     menu.auto:spacer("headerEauto", "[E] Settings")
     menu.auto:boolean("use_e_aa", "Use E in ally AA", true)
 
+    
+    menu.auto:spacer("headerRauto", "[R] Settings")
+    menu.auto:boolean("use_r_channeling", "Use R Interrupt", true)
+
+    menu:header("harass", "Harass")
+    --menu.harass:spacer("headerQ", "[Q] Settings")
+    --menu.harass:boolean("use_q", "Use Q", true)
+
+   -- menu.harass:spacer("headerW", "[W] Settings")
+    --menu.harass:boolean("use_w", "Use W", true)
+
+   -- menu.harass:spacer("headerW", "[E] Settings")
+   -- menu.harass:boolean("use_e", "Use E", true)
+
+    menu:header("prio", "Priority")
+        for _, obj in ipairs(objManager.heroes.list) do
+            if obj and obj.team == myHero.team then
+                local ally = obj
+                local priority = priorityTable[ally.skinName] ~= nil and priorityTable[ally.skinName] or 1
+                menu.prio:slider(ally.skinName .. "_prio", ally.skinName .. " Priority", 1, 5, priority, 1)
+            end
+
+        end
 
     menu:header("misc", "Misc")
     menu.misc:keybind('manual_q', 'Manual Q', 0x51, false, false)
+    menu.misc:keybind('manual_r', 'Manual R', 0x51, false, false)
 
 
     menu:header("drawings", "Drawings")
     menu.drawings:boolean("draw_q", "Draw Q", true)
-    menu.drawings:color('color_q', 'Q Color', graphics.argb(255, 255, 0, 0))
-    menu.drawings:boolean("draw_w", "Draw W", true)
+   -- menu.drawings:color('color_q', 'Q Color', graphics.argb(255, 255, 0, 0))
+    menu.drawings:boolean("draw_w", "Draw W", false)
     menu.drawings:color('color_w', 'W Color', graphics.argb(255, 255, 0, 0))
-    menu.drawings:boolean("draw_e", "Draw E", true)
+    menu.drawings:boolean("draw_e", "Draw E", false)
     menu.drawings:color('color_e', 'E Color', graphics.argb(255, 255, 0, 0))
-    menu.drawings:boolean("draw_r", "Draw R", true)
+    menu.drawings:boolean("draw_r", "Draw R", false)
     menu.drawings:color('color_r', 'R Color', graphics.argb(255, 255, 0, 0))
 
 end
@@ -481,8 +484,10 @@ end
 
 function Nami:OnDraw()
     if menu.drawings.draw_q:get() then
-        local alpha = myHero:spellSlot(SpellSlot.Q).state == 0 and 255 or 50
-        graphics.drawCircle(myHero.pos, self.Spells.Q.range, 1, menu.drawings.color_q:get())
+       -- local alpha = myHero:spellSlot(SpellSlot.Q).state == 0 and 255 or 50
+        --graphics.drawCircle(myHero.pos, self.Spells.Q.range, 1, menu.drawings.color_q:get())
+       graphics.drawCircleRainbow(myHero.pos, self.Spells.Q.range, 1.5, 2)
+
     end
     
     if menu.drawings.draw_w:get() then
@@ -674,14 +679,16 @@ function Nami:channelingSpell()
     end
 
     local UseQ = menu.auto.use_q_channeling:get()
-    
+    local buff = target.isUnstoppable or target:findBuff("MorganaE") or target:findBuff("bansheesveil") or target:findBuff("itemmagekillerveil") or target:findBuff("malzaharpassiveshield")
     local channelingSpell = (target.isCastingInterruptibleSpell and target.isCastingInterruptibleSpell > 0)
-    --local canBeStunned = not target.isUnstoppable and not target:getBuff("MorganaE") and not target:getBuff("bansheesveil") and not target:getBuff("itemmagekillerveil") and not target:getBuff("malzaharpassiveshield")
+
+    if buff ~= nil and buff.valid == true then return end
 
     if UseQ and channelingSpell then
         print("casteiQ")
         myHero:castSpell(SpellSlot.Q, target)
     end
+end
     ::continue::
 end
 
@@ -697,8 +704,6 @@ function Nami:KillSteal()
                 end
             end
         end
-    end
-
 end
 
 function Nami:QAA(obj, attack)
@@ -727,7 +732,6 @@ end
 
 function Nami:UseQ(target, prediction)
     if not prediction then return Input:CastSpell(SpellSlot.Q, target) end
-
     return Input:CastSpell(SpellSlot.Q, prediction.castPosition)
 end
 
@@ -767,20 +771,23 @@ function Nami:Combo()
         self:UseW()
     end
 
+    local ManualR = menu.misc.manual_r:get()
+    if ManualR then
+        local target = Utility:GetTarget(function (a) return Utility:GetDistance(a, myHero) < 2650 end) 
+        if not target then return end
+        self:UseR(target.asAIBase)
+    end
 
     local target = Utility:GetTarget(function (a) return Utility:GetDistance(a, myHero) < self.Spells.Q.range end) 
     if not target then return end
     --if self:IsSpellLocked() then return end
 
     local ComboActive = orb.isComboActive
-    local HarassActive = orb.harassKeyDown
+    --local HarassActive = orb.harassKeyDown
     local UseQ = menu.combo.use_q:get()
     local UseW = menu.auto.use_w:get()
-    local UseR = menu.combo.use_r:get()
-
     local ManualQ = menu.misc.manual_q:get()
     
-
     if UseW then
         self:UseW()
     end
@@ -788,6 +795,8 @@ function Nami:Combo()
     if UseQ and ComboActive or ManualQ then
         self:GetQSpeed(target.asAIBase)
     end
+
+
 end
 
 Menu = Menu()

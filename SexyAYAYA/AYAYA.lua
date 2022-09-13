@@ -1,8 +1,8 @@
-local dead = graphics.createTexture("C:\\ProgramData\\2264419601716787603\\Scripts\\CSXAYAYA\\Pictures\\die.png")
-local double_kill = graphics.createTexture("C:\\ProgramData\\2264419601716787603\\Scripts\\CSXAYAYA\\Pictures\\double_kill.png")
-local triple_kill = graphics.createTexture("C:\\ProgramData\\2264419601716787603\\Scripts\\CSXAYAYA\\Pictures\\triple_kill.png")
-local quadra_kill = graphics.createTexture("C:\\ProgramData\\2264419601716787603\\Scripts\\CSXAYAYA\\Pictures\\quadra_kill.png")
-local penta_kill = graphics.createTexture("C:\\ProgramData\\2264419601716787603\\Scripts\\CSXAYAYA\\Pictures\\penta_kill.png")
+local dead = graphics.createTexture("C:\\ProgramData\\1382341331797870047\\Scripts\\CSXAYAYA\\Pictures\\die.png")
+local double_kill = graphics.createTexture("C:\\ProgramData\\1382341331797870047\\Scripts\\CSXAYAYA\\Pictures\\double_kill.png")
+local triple_kill = graphics.createTexture("C:\\ProgramData\\1382341331797870047\\Scripts\\CSXAYAYA\\Pictures\\triple_kill.png")
+local quadra_kill = graphics.createTexture("C:\\ProgramData\\1382341331797870047\\Scripts\\CSXAYAYA\\Pictures\\quadra_kill.png")
+local penta_kill = graphics.createTexture("C:\\ProgramData\\1382341331797870047\\Scripts\\CSXAYAYA\\Pictures\\penta_kill.png")
 -- AYAYA "class" constructor
 local Menu = setmetatable({}, 
 {
@@ -68,6 +68,9 @@ function AYAYA:init()
     self.triple = nil
     self.quadra = nil
     self.penta  = nil
+    self.candouble = false
+    self.cantriple = false
+    self.canquadra = false
     self.canPenta = false
 end
 
@@ -105,18 +108,20 @@ end
 
 function AYAYA:OnTick()
 
-
     if self.killTable ~= nil and #self.killTable ~= 0 then
         local pastKillCount = #self.killTable
         for _, kill in ipairs(self.killTable) do
             local time = kill.killTime
             if self.double == nil and #self.killTable == 2 then
+                self.candouble = game.time
                 self.double = game.time
             end
             if self.triple == nil and #self.killTable == 3 then
+                self.cantriple = game.time
                 self.triple = game.time
             end
             if self.quadra == nil and #self.killTable == 4 then
+                self.canquadra = game.time
                 self.quadra = game.time
             end
             if self.penta == nil and #self.killTable == 5 then
@@ -125,17 +130,37 @@ function AYAYA:OnTick()
             end
         end 
     end 
+    if self.double ~= nil then print(#self.killTable) return end
+    if self.triple ~= nil then print(#self.killTable) return end
+    if self.quadra ~= nil then print(#self.killTable) return end
     if self.penta ~= nil then print(#self.killTable) return end
 end
 
 function AYAYA:OnDraw()
     if not menu.use_ayaya:get() then return end 
+
+    if self.candouble ~= false  and self.candouble + 5 > game.time then
+        graphics.drawTexture(double_kill, vec2(730, 150), vec2(500, 500))
+    end
+
+    if self.cantriple ~= false  and self.cantriple + 5 > game.time then
+        graphics.drawTexture(triple_kill, vec2(730, 150), vec2(500, 500))
+    end
+
+    if self.canquadra ~= false  and self.canquadra + 5 > game.time then
+        graphics.drawTexture(quadra_kill, vec2(730, 150), vec2(500, 500))
+    end
+
     if self.canPenta ~= false and self.canPenta + 5 > game.time then
-        graphics.drawTexture(dead, vec2(730, 150), vec2(500, 500))
+        graphics.drawTexture(penta_kill, vec2(730, 150), vec2(500, 500))
+        --sound.play("C:\\ProgramData\\2264419601716787603\\Scripts\\CSXAYAYA\\Pictures\\master_wet.wav")
     end
     if self.isDead ~= false and game.time < self.isDead + 5 then 
         graphics.drawTexture(dead, vec2(730, 150), vec2(500, 500))
     end
+
+     --sound.play("C:\\ProgramData\\1382341331797870047\\Scripts\\CSXAYAYA\\Pictures\\master_wet.wav")
+
 
 
 end
