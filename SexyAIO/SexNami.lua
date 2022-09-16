@@ -1,9 +1,15 @@
 --[[   
 Todo:
 Blacklist ally W E
-E se ally der spell
 castar Q na zonyas
-Haras - zzzzzzzzzzzzzz
+
+DONE
+Fixar range do Castar Q em spell
+Ta castando Q morto (logica do cc eu acho)
+fixar nome do W > Only W if hp <=
+Melhorar predict do Q (TESTING)
+auto E in spells
+
 --]]
 
 -- Settings table, will use this instead of retrieving menu value using :get() 
@@ -253,7 +259,6 @@ function Utility:NearestAlly(position)
     return closest
 end
 
-
 local delayedActions, delayedActionsExecuter = {}, nil
 function Utility:DelayAction(func, delay, args)
     if not delayedActionsExecuter then
@@ -319,13 +324,11 @@ end
 
 function Input:SendMove(pos)
     if not pos then return end
-
     return myHero:SendMove(pos)
 end
 
 function Input:SendAttack(unit)
     if not unit then return end
-
     return myHero:SendAttack(unit)
 end
 
@@ -359,26 +362,12 @@ function Menu:init()
 
     menu.auto:spacer("headerWauto", "[W] Settings")
     menu.auto:boolean("use_w", "Use W", true)
-    menu.auto:slider('heal_slider', "Don't W if Health <=", 5, 100, 30, 5)
-    menu.auto:boolean("use_w_ks", "Use W KillSteal", true)
-
+    menu.auto:slider('heal_slider', "Only W if Health <=", 5, 100, 30, 5)
+    menu.auto:boolean("use_w_ks", "Use W KillSteal", false)
 
     menu.auto:spacer("headerEauto", "[E] Settings")
     menu.auto:boolean("use_e_aa", "Use E in ally AA", true)
-
-    
-    menu.auto:spacer("headerRauto", "[R] Settings")
-    menu.auto:boolean("use_r_channeling", "Use R Interrupt", true)
-
-    menu:header("harass", "Harass")
-    --menu.harass:spacer("headerQ", "[Q] Settings")
-    --menu.harass:boolean("use_q", "Use Q", true)
-
-   -- menu.harass:spacer("headerW", "[W] Settings")
-    --menu.harass:boolean("use_w", "Use W", true)
-
-   -- menu.harass:spacer("headerW", "[E] Settings")
-   -- menu.harass:boolean("use_e", "Use E", true)
+    menu.auto:boolean("use_e_spells", "Use E in ally target spells", true)
 
     menu:header("prio", "Priority")
         for _, obj in ipairs(objManager.heroes.list) do
@@ -394,16 +383,11 @@ function Menu:init()
     menu.misc:keybind('manual_q', 'Manual Q', 0x51, false, false)
     menu.misc:keybind('manual_r', 'Manual R', 0x51, false, false)
 
-
     menu:header("drawings", "Drawings")
     menu.drawings:boolean("draw_q", "Draw Q", true)
-   -- menu.drawings:color('color_q', 'Q Color', graphics.argb(255, 255, 0, 0))
     menu.drawings:boolean("draw_w", "Draw W", false)
-    menu.drawings:color('color_w', 'W Color', graphics.argb(255, 255, 0, 0))
     menu.drawings:boolean("draw_e", "Draw E", false)
-    menu.drawings:color('color_e', 'E Color', graphics.argb(255, 255, 0, 0))
     menu.drawings:boolean("draw_r", "Draw R", false)
-    menu.drawings:color('color_r', 'R Color', graphics.argb(255, 255, 0, 0))
 
 end
 
@@ -491,23 +475,21 @@ function Nami:OnDraw()
     end
     
     if menu.drawings.draw_w:get() then
-        local alpha = myHero:spellSlot(SpellSlot.W).state == 0 and 255 or 50
-        graphics.drawCircle(myHero.pos, self.Spells.W.range, 1, menu.drawings.color_w:get())
+        graphics.drawCircleRainbow(myHero.pos, self.Spells.W.range, 1.5, 2)
     end
 
     if menu.drawings.draw_e:get() then
-        local alpha = myHero:spellSlot(SpellSlot.E).state == 0 and 255 or 50
-        graphics.drawCircle(myHero.pos, self.Spells.E.range, 1, menu.drawings.color_e:get())
+        graphics.drawCircleRainbow(myHero.pos, self.Spells.E.range, 1.5, 2)
+
     end
     
     if menu.drawings.draw_r:get() then
-        local alpha = myHero:spellSlot(SpellSlot.R).state == 0 and 255 or 50
-        graphics.drawCircle(myHero.pos, self.Spells.R.range, 1, menu.drawings.color_r:get())
+        graphics.drawCircleRainbow(myHero.pos, self.Spells.R.range, 1.5, 2)
     end
 
     if self.selectedAlly then
 
-        graphics.drawCircleFilled(self.selectedAlly.pos, 400, graphics.argb(140, 0, 255, 120))
+        graphics.drawCircleFilled(self.selectedAlly.pos, 200, graphics.argb(140, 0, 10, 120))
     end
 end
 
@@ -519,7 +501,7 @@ end
 
 function Nami:GetQSpeed(target)
     if not Utility:Validate(target) then return end
-    local pred = pred.positionAfterTime(target, 0.976)
+    local pred = pred.positionAfterTime(target, 1)
     local points = self:GetMECPoints()
     if points and #points >= 2 then 
         pred = mec.find(points).center
@@ -557,6 +539,11 @@ function Nami:OnBasicAttack(obj, attack)
     self:useE(obj, attack)
 end
 
+function Nami:OnProcessSpell(obj, spell)
+    self:useQspell(obj, spell)
+    self:useEspell(obj, spell)
+end
+
 function Nami:isCastingInterruptibleSpell(obj)
     self:channelingSpell(obj)
 end
@@ -579,20 +566,8 @@ function Nami:OnNewPath(obj, path, isDash, speed)
             end
         end, 0.976 - Endtime)
     end
+    print("Q pra Dash/jump")
         Input:CastSpell(SpellSlot.Q, Endpos) 
-end
-
-function Nami:OnProcessSpell(obj, spell)
-    if not menu.auto.use_q_spells:get() then return end 
-    if obj.team == myHero.team then return end
-    if not obj.isHero then return end
-    if not spell then return end
-    --print(self:CalculateEscapeTime(obj, spell.castDelay))
-    if spell.name:find("Summoner") then return end
-    if self:CalculateCastToLand() - self:CalculateEscapeTime(obj, spell.castDelay) <= 0.15 then 
-        self:UseQ(obj)
-    end
-
 end
 
 function Nami:OnBuff(obj, buff)
@@ -603,6 +578,7 @@ function Nami:OnBuff(obj, buff)
     not obj.isHero then
         return
     end
+    if not Utility:Validate(obj) then return end
     if Utility:GetDistance(obj, myHero) > (self.Spells.Q.range + self.Spells.Q.radius / 2) or
     not menu.auto.use_q_cc:get() then 
         return 
@@ -614,7 +590,7 @@ function Nami:OnBuff(obj, buff)
     local totalTime = ccedTime - castTime + ping + 0.4366
     if totalTime >= self:CalculateEscapeTime(obj, 0) then return end
     if totalTime < 0 then return end
-
+    print("Castei Q pra CC")
     return Input:CastSpell(SpellSlot.Q, obj.pos)
 end
 
@@ -649,7 +625,6 @@ function Nami:GetAlly(range)
     if self.selectedAlly ~= nil and Utility:IsValidAlly(self.selectedAlly) and Utility:GetDistance(myHero, self.selectedAlly) < range  then
         return self.selectedAlly
     end
-
     local attackCount = math.huge
     local healAlly = nil 
     for _, ally in ipairs(objManager.heroes.allies.list) do
@@ -685,7 +660,7 @@ function Nami:channelingSpell()
     if buff ~= nil and buff.valid == true then return end
 
     if UseQ and channelingSpell then
-        print("casteiQ")
+        print("Q pra Interrupt")
         myHero:castSpell(SpellSlot.Q, target)
     end
 end
@@ -700,6 +675,7 @@ function Nami:KillSteal()
             if target.isEnemy and target.isVisible and target.isTargetable and not target.isDead and target.isValid and not target.isZombie and target:isValidTarget(self.Spells.W.range, true, myHero.pos) then
                 local dmg = self:getWDamage()
                 if dmg >= target.health then
+                    print("Q pro KS")
                     myHero:castSpell(SpellSlot.W, target)
                 end
             end
@@ -712,7 +688,24 @@ function Nami:QAA(obj, attack)
     if not obj.isHero then return end
     if not attack then return end
     if attack.target and attack.target == myHero then return end
+    if Utility:GetDistance(obj, myHero) > (self.Spells.Q.range + self.Spells.Q.radius / 2) then return end
     if self:CalculateCastToLand() - self:CalculateEscapeTime(obj, attack.castDelay) <= 0.25 then 
+        print("Q pro AA")
+        self:UseQ(obj)
+    end
+end
+
+function Nami:useQspell(obj, spell)
+    if not menu.auto.use_q_spells:get() then return end 
+    if obj.team == myHero.team then return end
+    if not obj.isHero then return end
+    if not spell then return end
+
+    if Utility:GetDistance(obj, myHero) > (self.Spells.Q.range + self.Spells.Q.radius / 2) then return end
+    --print(self:CalculateEscapeTime(obj, spell.castDelay))
+    if spell.name:find("Summoner") then return end
+    if self:CalculateCastToLand() - self:CalculateEscapeTime(obj, spell.castDelay) <= 0.15 then 
+        print("Q pra spell")
         self:UseQ(obj)
     end
 end
@@ -747,8 +740,23 @@ end
 function Nami:useE(obj, attack)
     if not menu.auto.use_e_aa:get() then return end 
     if obj.team == myHero.team and obj.networkId ~= myHero.networkId and Utility:GetDistance(obj, myHero) < 800 and attack.hasTarget and attack.target.isHero then
+        print("buffei pro AA")
         myHero:castSpell(SpellSlot.E, obj)
     end
+end
+
+function Nami:useEspell(obj, spell)
+    if not menu.auto.use_e_spells:get() then return end 
+    if not obj.isHero then return end
+    if not spell then return end
+    if spell.name:find("Summoner") then return end
+    if target == nil then return end
+    if obj.team == myHero.team and obj.networkId ~= myHero.networkId and Utility:GetDistance(obj, myHero) < 800 and spell.hasTarget and spell.target.isHero then
+  -- if obj.team == myHero.team and obj.networkId ~= myHero.networkId and Utility:GetDistance(obj, myHero) < 800 and spell.target.isHero then
+        print("buffei pra spell")
+        myHero:castSpell(SpellSlot.E, obj)
+    end
+
 end
 
 function Nami:UseR(target, prediction)
@@ -768,6 +776,8 @@ function Nami:Combo()
 
     local UseW = menu.auto.use_w:get()
     if UseW then
+        local target = Utility:GetTarget(function (a) return Utility:GetDistance(a, myHero) < self.Spells.Q.range end) 
+        if not target then return end
         self:UseW()
     end
 
