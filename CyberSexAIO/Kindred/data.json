@@ -1,7 +1,0 @@
-{
-  "Name": "CSXAIO",    
-  "File": "CSXKindred.lua",
-  "Version": 1.0,
-  "Type": "champion",
-  "Champions": ["Kindred"]
-}
